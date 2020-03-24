@@ -3,6 +3,7 @@ import sklearn
 import sklearn.datasets
 from sklearn.utils import shuffle as util_shuffle
 
+import pdb
 
 # Dataset iterator
 def inf_train_gen(data, rng=None, batch_size=200):
@@ -113,6 +114,14 @@ def inf_train_gen(data, rng=None, batch_size=200):
         x = rng.rand(batch_size) * 5 - 2.5
         y = x
         return np.stack((x, y), 1)
+
+    elif data == 'HDline':
+       x = rng.rand(batch_size) * 5 - 2.5
+       x = x.reshape(-1, 1)
+       y = x
+       z = np.zeros((batch_size, 14)) # 16 dim
+       return np.concatenate((x, y, z), 1)
+    
     elif data == "cos":
         x = rng.rand(batch_size) * 5 - 2.5
         y = np.sin(x) * 2.5

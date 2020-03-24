@@ -7,6 +7,7 @@ import torch
 LOW = -4
 HIGH = 4
 
+import pdb
 
 def plt_potential_func(potential, ax, npts=100, title="$p(x)$"):
     """
@@ -59,15 +60,20 @@ def plt_flow(prior_logdensity, transform, ax, npts=100, title="$q(x)$", device="
     ax.set_title(title)
 
 
-def plt_flow_density(prior_logdensity, inverse_transform, ax, npts=100, memory=100, title="$q(x)$", device="cpu"):
+def plt_flow_density(prior_logdensity, inverse_transform, ax, npts=100, memory=100, title="$q(x)$", device="cpu",
+                    dim=2):
     side = np.linspace(LOW, HIGH, npts)
     xx, yy = np.meshgrid(side, side)
     x = np.hstack([xx.reshape(-1, 1), yy.reshape(-1, 1)])
+    if dim > 2:
+      pad = np.zeros((len(x), dim-2))
+      x = np.concatenate((x,pad), 1)
 
     x = torch.from_numpy(x).type(torch.float32).to(device)
     zeros = torch.zeros(x.shape[0], 1).to(x)
 
     z, delta_logp = [], []
+    # pdb.set_trace()
     inds = torch.arange(0, x.shape[0]).to(torch.int64)
     for ii in torch.split(inds, int(memory**2)):
         z_, delta_logp_ = inverse_transform(x[ii], zeros[ii])
@@ -87,8 +93,9 @@ def plt_flow_density(prior_logdensity, inverse_transform, ax, npts=100, memory=1
     ax.set_title(title)
 
 
-def plt_flow_samples(prior_sample, transform, ax, npts=100, memory=100, title="$x ~ q(x)$", device="cpu"):
-    z = prior_sample(npts * npts, 2).type(torch.float32).to(device)
+def plt_flow_samples(prior_sample, transform, ax, npts=100, memory=100, title="$x ~ q(x)$", device="cpu", dim=2):
+    # NOTE: 'dim' used to be 2
+    z = prior_sample(npts * npts, dim).type(torch.float32).to(device)
     zk = []
     inds = torch.arange(0, z.shape[0]).to(torch.int64)
     for ii in torch.split(inds, int(memory**2)):
@@ -111,8 +118,7 @@ def plt_samples(samples, ax, npts=100, title="$x ~ p(x)$"):
 
 def visualize_transform(
     potential_or_samples, prior_sample, prior_density, transform=None, inverse_transform=None, samples=True, npts=100,
-    memory=100, device="cpu"
-):
+    memory=100, device="cpu", dim=2):
     """Produces visualization for the model density and samples from the model."""
     plt.clf()
     ax = plt.subplot(1, 3, 1, aspect="equal")
@@ -125,8 +131,8 @@ def visualize_transform(
     if inverse_transform is None:
         plt_flow(prior_density, transform, ax, npts=npts, device=device)
     else:
-        plt_flow_density(prior_density, inverse_transform, ax, npts=npts, memory=memory, device=device)
+        plt_flow_density(prior_density, inverse_transform, ax, npts=npts, memory=memory, device=device, dim=dim)
 
     ax = plt.subplot(1, 3, 3, aspect="equal")
     if transform is not None:
-        plt_flow_samples(prior_sample, transform, ax, npts=npts, memory=memory, device=device)
+        plt_flow_samples(prior_sample, transform, ax, npts=npts, memory=memory, device=device, dim=dim)

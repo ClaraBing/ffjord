@@ -25,7 +25,7 @@ from diagnostics.viz_toy import save_trajectory, trajectory_to_video
 SOLVERS = ["dopri5", "bdf", "rk4", "midpoint", 'adams', 'explicit_adams', 'fixed_adams']
 parser = argparse.ArgumentParser('Continuous Normalizing Flow')
 parser.add_argument(
-    '--data', choices=['swissroll', '8gaussians', 'pinwheel', 'circles', 'moons', '2spirals', 'checkerboard', 'rings'],
+    '--data', choices=['swissroll', '8gaussians', 'pinwheel', 'circles', 'moons', '2spirals', 'checkerboard', 'rings', 'line', 'HDline'],
     type=str, default='pinwheel'
 )
 parser.add_argument(
@@ -87,6 +87,13 @@ logger.info(args)
 
 device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
 
+try:
+  import wandb
+  USE_WANDB = True
+  wandb.init(project='density', name='ffjord_'+args.save, config=args)
+except:
+  USE_WANDB = False
+
 
 def get_transforms(model):
 
@@ -127,7 +134,8 @@ def compute_loss(args, model, batch_size=None):
 if __name__ == '__main__':
 
     regularization_fns, regularization_coeffs = create_regularization_fns(args)
-    model = build_model_tabular(args, 2, regularization_fns).to(device)
+    input_dim = 2 if args.data != 'HDline' else 16
+    model = build_model_tabular(args, input_dim, regularization_fns).to(device)
     if args.spectral_norm: add_spectral_norm(model)
     set_cnf_options(args, model)
 
@@ -180,6 +188,16 @@ if __name__ == '__main__':
                 nfeb_meter.val, nfeb_meter.avg, tt_meter.val, tt_meter.avg
             )
         )
+        if USE_WANDB:
+          wandb.log({
+            'loss': loss_meter.val,
+            'loss_avg': loss_meter.avg,
+            'NFE_forward': nfef_meter.val,
+            'NFE_forward_avg': nfef_meter.avg,
+            'NFE_backward': nfeb_meter.val,
+            'NFE_backward_avg': nfeb_meter.avg,
+          })
+
         if len(regularization_coeffs) > 0:
             log_message = append_regularization_to_log(log_message, regularization_fns, reg_states)
 
@@ -212,7 +230,7 @@ if __name__ == '__main__':
                 plt.figure(figsize=(9, 3))
                 visualize_transform(
                     p_samples, torch.randn, standard_normal_logprob, transform=sample_fn, inverse_transform=density_fn,
-                    samples=True, npts=800, device=device
+                    samples=True, npts=800, device=device, dim=input_dim
                 )
                 fig_filename = os.path.join(args.save, 'figs', '{:04d}.jpg'.format(itr))
                 utils.makedirs(os.path.dirname(fig_filename))
